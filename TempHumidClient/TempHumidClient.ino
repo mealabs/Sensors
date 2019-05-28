@@ -1,6 +1,7 @@
 #include <ESP8266HTTPClient.h>
 #include <ESP8266WiFi.h>
 #include "DHT.h"
+#include <WiFiUdp.h>
 
 //Variables for WiFi
 char ssid[] = "Animal-Shelter";
@@ -9,7 +10,8 @@ char pass[] = "kyleisdum";
 //Variables for Servers
 String serverIP = "192.168.137.1";
 String serverPort = "80";
-String serverURL = "http://"+serverIP + ":" +serverPort;
+//String serverURL = "http://"+serverIP + ":" +serverPort;
+String serverURL = "http://ff770eb3.ngrok.io/"
 
 //Variables for Client
 HTTPClient http;
@@ -23,6 +25,12 @@ DHT dht(DHTPIN, DHTTYPE);
 float humidValue;
 float tempValue;
 
+//Variables for currentTime
+const long utcOffsetInSeconds = -18000;
+WiFiUDP ntpUDP;
+NTPClient timeClient(ntpUDP, "pool.ntp.org", utcOffsetInSeconds);
+String currentTime;
+
 void setup() {
   Serial.begin(115200);
   Serial.println("Serial Begun");
@@ -32,7 +40,6 @@ void setup() {
 
   //begin the WiFi
   beginWiFi();
-  http.begin(serverURL);
 
 }
 
@@ -77,16 +84,28 @@ void readtempHumidData(){
 }
 
 void sendData(){
-   http.begin("http://ff770eb3.ngrok.io/");
-   //Specify content-type header
-   http.addHeader("Content-Type", "application/json");  
-    //Send the request
-   httpCode = http.POST("{ \"Temperature\": \"" + String(tempValue) + "\", \"Humidity\":\"" + String(humidValue) + "\"}");   
-   //Get the response payload
-   payload = http.getString(); 
-                    
-   Serial.println("Return Code: " + String(httpCode));   //Print HTTP return code
-   Serial.println("Payload: " + String(payload));
- 
-   http.end();  //Close connection
+  http.begin(serverURL);
+  //Specify content-type header
+  http.addHeader("Content-Type", "application/json");  
+  //Send the request
+  data = "{\"Device Type\": \"ESP8266\",\"Device Name\": \"Temperature_Humidity_Sensor\",\"Connection Type\": \"HTTP\",\"Sensor Data\": {\"Temperature\": \""+ String(tempValue)+"\",\"Humidity\": \""+String(humidValue)+"\"},\"Time Stamp\": \""+currentTime+"\"}"
+  httpCode = http.POST(data);   
+  //Get the response payload
+  payload = http.getString(); 
+                  
+  Serial.println("Return Code: " + String(httpCode));   //Print HTTP return code
+  Serial.println("Payload: " + String(payload));
+
+  http.end();  //Close connection
 }
+
+// {
+//   "Device Type": "ESP8266",
+//   "Device Name": "Temperature_Humidity_Sensor",
+//   "Connection Type": "HTTP",
+//   "Sensor Data": {
+//     "Temperature": "21*C",
+//     "Humidity": "50%"
+//   },
+//   "Time Stamp": "5-28-2019;2:09PM"
+// }

@@ -2,6 +2,7 @@
 #include <ESP8266WiFi.h>
 #include "DHT.h"
 #include <WiFiUdp.h>
+#include <NTPClient.h>
 
 // Variables for WiFi
 char ssid[] = "Animal-Shelter";
@@ -11,10 +12,11 @@ char pass[] = "kyleisdum";
 String serverIP = "192.168.137.1";
 String serverPort = "80";
 //String serverURL = "http://"+serverIP + ":" +serverPort;
-String serverURL = "http://ff770eb3.ngrok.io/"
+String serverURL = "http://4cd1a0b4.ngrok.io/";
 
 // Variables for Client
 HTTPClient http;
+String data;
 int httpCode = 0;
 String payload = "";
 
@@ -25,8 +27,8 @@ DHT dht(DHTPIN, DHTTYPE);
 float humidValue;
 float tempValue;
 
-// Variables for currentTime
-const long utcOffsetInSeconds = -18000;
+//Variables for currentTime
+const long utcOffsetInSeconds = 18000;
 WiFiUDP ntpUDP;
 NTPClient timeClient(ntpUDP, "pool.ntp.org", utcOffsetInSeconds);
 String currentTime;
@@ -44,24 +46,21 @@ void setup()
     // Begin the dht Sensor
     dht.begin();
 
-    // Begin the WiFi
-    beginWiFi();
-    http.begin(serverURL);
+  timeClient.begin();
 }
 
-void loop()
-{
-    readtempHumidData();
+void loop() {
+  // put your main code here, to run repeatedly:
 
-    if (WiFi.status() == WL_CONNECTED)
-    {
-        sendData();
-    }
-    else
-    {
-        Serial.println("Error in WiFi connection");
-    }
-    delay(1000);
+  readtempHumidData();
+  currentTime = timeClient.getFormattedTime();
+
+  if(WiFi.status()== WL_CONNECTED){
+    sendData();
+  }else{
+    Serial.println("Error in WiFi connection");
+  }
+  delay(1000);
 }
 
 void beginWiFi()
@@ -80,34 +79,32 @@ void beginWiFi()
     Serial.println(WiFi.localIP()); // Print the local IP
 }
 
-void readtempHumidData()
-{
-    humidValue = dht.readHumidity();
-    tempValue = dht.readTemperature();
+void readtempHumidData(){
+  humidValue = dht.readHumidity();
+  tempValue = dht.readTemperature();
 
-    if (isnan(humidValue) || isnan(tempValue))
-    {
-        Serial.println("Failed to read from DHT sensor!");
-        return;
-    }
-    Serial.print("Humidity: " + String(humidValue) + " %\t");
-    Serial.println("Temperature: " + String(tempValue) + "*C" + "\t");
+  if (isnan(humidValue) || isnan(tempValue)) {
+    Serial.println("Failed to read from DHT sensor!");
+    return;
+  }
 }
 
-void sendData()
-{
-    http.begin(serverURL);
-    // Specify content-type header
-    http.addHeader("Content-Type", "application/json");
-    // Send the request
-    data = "{\"Device Type\": \"ESP8266\",\"Device Name\": \"Temperature_Humidity_Sensor\",\"Connection Type\": \"HTTP\",\"Sensor Data\": {\"Temperature\": \"" + String(tempValue) + "\",\"Humidity\": \"" + String(humidValue) + "\"},\"Time Stamp\": \"" + currentTime + "\"}" httpCode = http.POST(data);
-    // Get the response payload
-    payload = http.getString();
+void sendData(){
+  http.begin(serverURL);
+  //Send the request
+  data = "{\"Device Type\": \"ESP8266\",\"Device Name\": \"Temperature_Humidity_Sensor\",\"Connection Type\": \"HTTP\",\"Sensor Data\": {\"Temperature\": \""+ String(tempValue)+"\",\"Humidity\": \""+String(humidValue)+"\"},\"Time Stamp\": \""+currentTime+"\"}";
+  Serial.println(data);
+  //Specify content-type header
+  http.addHeader("Content-Type", "application/json");
+  http.addHeader("Content-Length", String(data.length()));
+  httpCode = http.POST(data);
+  //Get the response payload
+  payload = http.getString();
 
-    Serial.println("Return Code: " + String(httpCode)); // Print HTTP return code
-    Serial.println("Payload: " + String(payload));
+  Serial.println("Return Code: " + String(httpCode));   //Print HTTP return code
+  Serial.println("Payload: " + String(payload));
 
-    http.end(); // Close connection
+  http.end();  //Close connection
 }
 
 // {
